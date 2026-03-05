@@ -51,6 +51,16 @@ def get_customer(customer_id: str, db: Session = Depends(get_db)):
 
 
 def _row_to_dict(row: Customer) -> dict:
+    def format_date_or_datetime(value):
+        """Convert date/datetime to ISO format string, handling string values from database."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        if hasattr(value, 'isoformat'):
+            return value.isoformat()
+        return str(value)
+    
     return {
         "customer_id": row.customer_id,
         "first_name": row.first_name,
@@ -58,7 +68,7 @@ def _row_to_dict(row: Customer) -> dict:
         "email": row.email,
         "phone": row.phone,
         "address": row.address,
-        "date_of_birth": row.date_of_birth.isoformat() if row.date_of_birth else None,
+        "date_of_birth": format_date_or_datetime(row.date_of_birth),
         "account_balance": float(row.account_balance) if row.account_balance is not None else None,
-        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "created_at": format_date_or_datetime(row.created_at),
     }
