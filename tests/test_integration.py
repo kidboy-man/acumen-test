@@ -5,6 +5,10 @@ Tests the complete workflow:
 1. Mock Server (Flask) API endpoints
 2. Pipeline Service (FastAPI) ingestion
 3. Pipeline Service database queries
+
+**Note**: Tests use an isolated test database (customer_db_test) to avoid
+polluting production/development data. The test database is automatically
+cleaned up after each test run when using `make test`.
 """
 
 import os

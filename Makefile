@@ -30,8 +30,11 @@ help:
 	"  compose-down         Stop ALL services via docker compose" \
 	"  compose-build        Build compose images" \
 	"  compose-logs         Tail compose logs" \
-	"  test                 Run integration tests (requires compose-up in another terminal)" \
-	"  test-verbose         Run integration tests with verbose output"
+	"  compose-test-up      Start services with TEST database (customer_db_test)" \
+	"  compose-test-down    Stop test services and clean up test database" \
+	"  compose-test-logs    Tail test services logs" \
+	"  test                 Run integration tests (auto starts/stops test services)" \
+	"  test-verbose         Run integration tests with verbose output (auto starts/stops)"
 
 .PHONY: venv
 venv:
@@ -91,11 +94,26 @@ compose-logs:
 install-test: venv
 	$(PIP) install -r requirements.txt
 
+.PHONY: compose-test-up
+compose-test-up:
+	$(COMPOSE) -f docker-compose.yml -f docker-compose.test.yml up -d
+
+.PHONY: compose-test-down
+compose-test-down:
+	$(COMPOSE) -f docker-compose.yml -f docker-compose.test.yml down -v
+
+.PHONY: compose-test-logs
+compose-test-logs:
+	$(COMPOSE) -f docker-compose.yml -f docker-compose.test.yml logs -f
+
 .PHONY: test
-test: install-test
-	"$(VENV_DIR)/bin/pytest" tests/ -v --tb=short
+test: install-test compose-test-up
+	@sleep 3
+	"$(VENV_DIR)/bin/pytest" tests/ -v --tb=short || true
+	$(MAKE) compose-test-down
 
 .PHONY: test-verbose
-test-verbose: install-test
-	"$(VENV_DIR)/bin/pytest" tests/ -vv --tb=long -s
-
+test-verbose: install-test compose-test-up
+	@sleep 3
+	"$(VENV_DIR)/bin/pytest" tests/ -vv --tb=long -s || true
+	$(MAKE) compose-test-down

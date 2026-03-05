@@ -1,0 +1,11 @@
+# Docker Compose override file for integration tests
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.test.yml up
+
+services:
+  postgres:
+    environment:
+      POSTGRES_DB: customer_db_test
+  
+  pipeline-service:
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/customer_db_test

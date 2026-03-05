@@ -121,6 +121,7 @@ This starts the database and prints instructions for running the other services.
 make help              # Show all available commands
 make venv              # Create Python virtual environment
 make install           # Install dependencies for both services
+make install-test      # Install test dependencies
 make db-up             # Start PostgreSQL container only
 make db-down           # Stop all Docker services
 make run-native-mock   # Run Flask server locally
@@ -130,24 +131,29 @@ make compose-up        # Start all services in Docker
 make compose-down      # Stop all Docker services
 make compose-build     # Build Docker images
 make compose-logs      # View live logs from containers
+make compose-test-up   # Start test services with isolated test database
+make compose-test-down # Stop test services and clean up test database
+make compose-test-logs # View live logs from test services
 ```
 
 ## Testing the Services
 
-### Test Flask Mock Server
+### Manual Testing with cURL
+
+#### Test Flask Mock Server
 
 ```bash
 curl http://localhost:5000/api/health
 curl "http://localhost:5000/api/customers?page=1&limit=5"
 ```
 
-### Ingest Data into Pipeline
+#### Ingest Data into Pipeline
 
 ```bash
 curl -X POST http://localhost:8000/api/ingest
 ```
 
-### Get Customers from Pipeline Database
+#### Get Customers from Pipeline Database
 
 ```bash
 curl "http://localhost:8000/api/customers?page=1&limit=5"
@@ -156,7 +162,17 @@ curl "http://localhost:8000/api/customers/cust_001"
 
 ## Integration Tests
 
-Comprehensive pytest-based integration tests are provided to verify the complete data pipeline workflow.
+Comprehensive pytest-based integration tests verify the complete data pipeline workflow.
+
+### Test Database Isolation
+
+Tests use a **separate test database** (`customer_db_test`) to:
+- Keep production/development data clean
+- Allow parallel and repeated test runs
+- Prevent data pollution from failed tests
+- Automatically clean up after test completion
+
+The test database is configured via [docker-compose.test.yml](docker-compose.test.yml) (overlay configuration).
 
 ### Prerequisites for Testing
 
@@ -164,57 +180,86 @@ Comprehensive pytest-based integration tests are provided to verify the complete
 make install-test
 ```
 
-This installs pytest and httpx dependencies.
+This installs pytest and httpx dependencies into your virtual environment.
 
-### Running Tests
+### Running Tests - Automatic Setup & Cleanup (Recommended)
 
-**Requirements**: Services must be running in Docker Compose.
+The simplest way to run tests - services start, tests execute, and everything cleans up automatically:
 
-In one terminal, start the services:
-```bash
-make compose-up
-```
-
-In another terminal, run the tests:
 ```bash
 make test
 ```
 
-For verbose output with detailed logging:
+Or with verbose output:
 ```bash
 make test-verbose
 ```
 
-### What the Tests Cover
+**What happens:**
+1. Test services start (mock server, pipeline service, test database)
+2. Integration tests run
+3. Test services and test database are automatically cleaned up
 
-**Mock Server Tests**
-- Health check endpoint
-- Customer list with default and custom pagination
-- Customer data structure validation
+### Running Tests - Manual Service Management
 
-**Pipeline Ingestion Tests**
-- Data ingestion from mock server into database
-- Record count verification
+If you prefer to manage services manually:
 
-**Pipeline Query Tests**
-- Paginated customer retrieval
+**Terminal 1 - Start test services:**
+```bash
+make compose-test-up
+```
+
+**Terminal 2 - Run the tests:**
+```bash
+.venv/bin/pytest tests/ -v
+```
+
+**Terminal 3 (optional) - View test service logs:**
+```bash
+make compose-test-logs
+```
+
+When done, clean up:
+```bash
+make compose-test-down
+```
+
+### Test Coverage
+
+**Mock Server Tests (4 tests)**
+- Health check endpoint validation
+- Customer list with default pagination
+- Custom pagination parameters
+- Customer data structure and required fields
+
+**Pipeline Ingestion Tests (1 test)**
+- Data ingestion from mock server into test database
+- Record count verification (22 customers)
+
+**Pipeline Query Tests (5 tests)**
+- Paginated customer retrieval from database
 - Single customer lookup by ID
-- 404 responses for non-existent customers
-- Data type validation
+- 404 error handling for non-existent customers
+- Data type validation for all fields
+- Pagination parameter handling
 
-**End-to-End Tests**
-- Complete workflow: mock server → ingestion → database queries
-- Data integrity verification across systems
-- Field consistency between source and destination
+**End-to-End Tests (1 test)**
+- Complete workflow: Mock Server → Ingestion → Database Queries
+- Data integrity verification between systems
+- Field consistency checks
 
 ### Test Output Example
 
 ```
-tests/test_integration.py::TestMockServer::test_health_check PASSED
-tests/test_integration.py::TestMockServer::test_list_customers_default_pagination PASSED
-tests/test_integration.py::TestPipelineIngestion::test_ingest_data PASSED
-tests/test_integration.py::TestPipelineQueries::test_list_customers_from_database PASSED
-tests/test_integration.py::TestEndToEnd::test_complete_workflow PASSED
+tests/test_integration.py::TestMockServer::test_health_check PASSED                    [  9%]
+tests/test_integration.py::TestMockServer::test_list_customers_default_pagination PASSED [ 18%]
+tests/test_integration.py::TestMockServer::test_customer_data_structure PASSED           [ 36%]
+tests/test_integration.py::TestPipelineIngestion::test_ingest_data PASSED                [ 45%]
+tests/test_integration.py::TestPipelineQueries::test_list_customers_from_database PASSED [ 54%]
+tests/test_integration.py::TestPipelineQueries::test_customer_by_id PASSED               [ 72%]
+tests/test_integration.py::TestEndToEnd::test_complete_workflow PASSED                   [100%]
+
+============================== 11 passed in 1.43s ==============================
 ```
 
 ## Project Structure
@@ -238,14 +283,16 @@ tests/test_integration.py::TestEndToEnd::test_complete_workflow PASSED
 │   └── services/
 │       └── ingestion.py      # Data ingestion logic using dlt
 │
-├── tests/                    # Integration tests
-│   ├── test_integration.py   # Pytest integration tests
-│   └── conftest.py           # Pytest configuration and fixtures
+├── tests/                       # Integration tests
+│   ├── test_integration.py       # Pytest integration tests (11 test cases)
+│   └── conftest.py               # Pytest configuration and fixtures
 │
-├── docker-compose.yml       # Docker Compose configuration for all services
-├── Makefile                 # Build automation and service management
-├── requirements-test.txt    # Test dependencies (pytest, httpx)
-└── README.md                # This file
+├── docker-compose.yml            # Docker Compose configuration for development/production
+├── docker-compose.test.yml       # Overlay config for test environment (isolated test DB)
+├── Makefile                      # Build automation and service management
+├── requirements.txt              # Test dependencies (pytest, httpx)
+├── .env.example                  # Environment variables template
+└── README.md                     # This file
 ```
 
 ## How It Works
@@ -253,6 +300,7 @@ tests/test_integration.py::TestEndToEnd::test_complete_workflow PASSED
 1. **Mock Server** (Flask) reads `customers.json` and exposes it via REST API with pagination
 2. **Pipeline Service** (FastAPI) fetches data from Mock Server via `/api/ingest` endpoint
 3. **dlt Library** handles data transformation and loading into PostgreSQL using merge disposition
+4. **Integration Tests** verify the complete workflow using an isolated test database (`customer_db_test`)
 4. **FastAPI** provides endpoints to query ingested customers from the database
 
 ## Database Schema
