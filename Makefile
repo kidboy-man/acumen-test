@@ -20,6 +20,7 @@ help:
 	"Targets:" \
 	"  venv                 Create local virtualenv in $(VENV_DIR)" \
 	"  install              Install mock-server and pipeline-service deps into venv" \
+	"  install-test         Install test dependencies" \
 	"  db-up                Start ONLY Postgres via docker compose" \
 	"  db-down              Stop Postgres (and other compose services if running)" \
 	"  run-native-mock      Run Flask mock server locally (uses venv)" \
@@ -28,7 +29,9 @@ help:
 	"  compose-up           Start ALL services via docker compose" \
 	"  compose-down         Stop ALL services via docker compose" \
 	"  compose-build        Build compose images" \
-	"  compose-logs         Tail compose logs"
+	"  compose-logs         Tail compose logs" \
+	"  test                 Run integration tests (requires compose-up in another terminal)" \
+	"  test-verbose         Run integration tests with verbose output"
 
 .PHONY: venv
 venv:
@@ -83,4 +86,16 @@ compose-build:
 .PHONY: compose-logs
 compose-logs:
 	$(COMPOSE) logs -f
+
+.PHONY: install-test
+install-test: venv
+	$(PIP) install -r requirements.txt
+
+.PHONY: test
+test: install-test
+	"$(VENV_DIR)/bin/pytest" tests/ -v --tb=short
+
+.PHONY: test-verbose
+test-verbose: install-test
+	"$(VENV_DIR)/bin/pytest" tests/ -vv --tb=long -s
 

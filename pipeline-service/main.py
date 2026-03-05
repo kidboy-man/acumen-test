@@ -9,6 +9,12 @@ from services.ingestion import run_ingestion
 app = FastAPI(title="Customer Pipeline API")
 
 
+@app.get("/api/health")
+def health_check():
+    """Health check endpoint."""
+    return {"status": "ok"}
+
+
 @app.post("/api/ingest")
 def ingest():
     """Fetch all data from Flask and upsert into PostgreSQL."""

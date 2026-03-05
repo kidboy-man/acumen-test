@@ -154,6 +154,69 @@ curl "http://localhost:8000/api/customers?page=1&limit=5"
 curl "http://localhost:8000/api/customers/cust_001"
 ```
 
+## Integration Tests
+
+Comprehensive pytest-based integration tests are provided to verify the complete data pipeline workflow.
+
+### Prerequisites for Testing
+
+```bash
+make install-test
+```
+
+This installs pytest and httpx dependencies.
+
+### Running Tests
+
+**Requirements**: Services must be running in Docker Compose.
+
+In one terminal, start the services:
+```bash
+make compose-up
+```
+
+In another terminal, run the tests:
+```bash
+make test
+```
+
+For verbose output with detailed logging:
+```bash
+make test-verbose
+```
+
+### What the Tests Cover
+
+**Mock Server Tests**
+- Health check endpoint
+- Customer list with default and custom pagination
+- Customer data structure validation
+
+**Pipeline Ingestion Tests**
+- Data ingestion from mock server into database
+- Record count verification
+
+**Pipeline Query Tests**
+- Paginated customer retrieval
+- Single customer lookup by ID
+- 404 responses for non-existent customers
+- Data type validation
+
+**End-to-End Tests**
+- Complete workflow: mock server → ingestion → database queries
+- Data integrity verification across systems
+- Field consistency between source and destination
+
+### Test Output Example
+
+```
+tests/test_integration.py::TestMockServer::test_health_check PASSED
+tests/test_integration.py::TestMockServer::test_list_customers_default_pagination PASSED
+tests/test_integration.py::TestPipelineIngestion::test_ingest_data PASSED
+tests/test_integration.py::TestPipelineQueries::test_list_customers_from_database PASSED
+tests/test_integration.py::TestEndToEnd::test_complete_workflow PASSED
+```
+
 ## Project Structure
 
 ```
@@ -175,8 +238,13 @@ curl "http://localhost:8000/api/customers/cust_001"
 │   └── services/
 │       └── ingestion.py      # Data ingestion logic using dlt
 │
+├── tests/                    # Integration tests
+│   ├── test_integration.py   # Pytest integration tests
+│   └── conftest.py           # Pytest configuration and fixtures
+│
 ├── docker-compose.yml       # Docker Compose configuration for all services
 ├── Makefile                 # Build automation and service management
+├── requirements-test.txt    # Test dependencies (pytest, httpx)
 └── README.md                # This file
 ```
 
