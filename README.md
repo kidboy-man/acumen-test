@@ -52,8 +52,10 @@ cp .env.example .env
 | `POSTGRES_PASSWORD` | PostgreSQL password | `password` |
 | `POSTGRES_DB` | PostgreSQL database name | `customer_db` |
 | `DATABASE_URL` | PostgreSQL connection string for Pipeline Service | `postgresql://postgres:password@postgres:5432/customer_db` |
+| `TEST_POSTGRES_DB` | Test database name (isolated for testing) | `customer_db_test` |
+| `TEST_DATABASE_URL` | Test database connection string (used by docker-compose.test.yml) | `postgresql://postgres:password@postgres:5432/customer_db_test` |
 
-**Note**: For production, change `POSTGRES_PASSWORD` to a strong, unique password.
+**Note**: For production, change `POSTGRES_PASSWORD` to a strong, unique password. The `TEST_*` variables define an isolated database used only during test runs to keep development data clean.
 
 ## Quick Start with Docker Compose
 

@@ -1,11 +1,13 @@
 # Docker Compose override file for integration tests
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.test.yml up
+# 
+# This override uses TEST_* environment variables from .env for test database isolation
 
 services:
   postgres:
     environment:
-      POSTGRES_DB: customer_db_test
+      POSTGRES_DB: ${TEST_POSTGRES_DB:-customer_db_test}
   
   pipeline-service:
     environment:
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/customer_db_test
+      DATABASE_URL: ${TEST_DATABASE_URL:-postgresql://postgres:password@postgres:5432/customer_db_test}
