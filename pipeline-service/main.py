@@ -1,10 +1,22 @@
 from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
+import logging
+import os
 
 from database import get_db
 from models.customer import Customer
 from services.ingestion import run_ingestion
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+    ]
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Customer Pipeline API")
 
@@ -19,11 +31,15 @@ def health_check():
 def ingest():
     """Fetch all data from Flask and upsert into PostgreSQL."""
     try:
+        logger.info("Starting data ingestion from mock server")
         records_processed = run_ingestion()
+        logger.info(f"Successfully ingested {records_processed} records")
         return {"status": "success", "records_processed": records_processed}
     except ValueError as e:
+        logger.error(f"Validation error during ingestion: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
+        logger.error(f"Unexpected error during ingestion: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=f"Ingestion failed: {e!s}")
 
 
@@ -35,25 +51,41 @@ def list_customers(
 ):
     """Return paginated customers from the database."""
     try:
+        logger.debug(f"Listing customers: page={page}, limit={limit}")
         total = db.query(Customer).count()
         offset = (page - 1) * limit
         rows = db.query(Customer).offset(offset).limit(limit).all()
-    except ProgrammingError:
+        
+        logger.info(f"Retrieved {len(rows)} customers from database (total: {total})")
+        
+        data = [_row_to_dict(r) for r in rows]
+        return {"data": data, "total": total, "page": page, "limit": limit}
+    except ProgrammingError as e:
+        logger.warning(f"Database table not found, returning empty result: {e}")
         return {"data": [], "total": 0, "page": page, "limit": limit}
-    data = [_row_to_dict(r) for r in rows]
-    return {"data": data, "total": total, "page": page, "limit": limit}
+    except Exception as e:
+        logger.error(f"Error in list_customers: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database query failed")
 
 
 @app.get("/api/customers/{customer_id}")
 def get_customer(customer_id: str, db: Session = Depends(get_db)):
     """Return a single customer by id or 404."""
     try:
+        logger.debug(f"Looking up customer: {customer_id}")
         customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
-    except ProgrammingError:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    if customer is None:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    return _row_to_dict(customer)
+        
+        if customer is None:
+            logger.warning(f"Customer not found: {customer_id}")
+            raise HTTPException(status_code=404, detail="Customer not found")
+        
+        logger.info(f"Retrieved customer: {customer_id}")
+        return _row_to_dict(customer)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving customer {customer_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database query failed")
 
 
 def _row_to_dict(row: Customer) -> dict:
